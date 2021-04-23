@@ -12,7 +12,7 @@ import random
 
 from seleniumwire import webdriver
 
-
+from webdriver_manager.chrome import ChromeDriverManager
 
 from selenium.webdriver.chrome.options import Options
 
@@ -54,7 +54,7 @@ def get_data(li_at, JSESSIONID, company):
 	options.add_argument('--headless')
 	options.add_argument('--disable-gpu')
 
-	driver = webdriver.Chrome("/home/ankush/QuantumGA/chromedriver", chrome_options=options)
+	driver = webdriver.Chrome(ChromeDriverManager().install(), chrome_options=options)
 
 	driver.get('https://www.google.com')
 
