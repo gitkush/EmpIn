@@ -5,5 +5,5 @@ pandas
 matplotlib
 bs4
 lxml
-seleniumwire
+selenium-wire
 selenium
