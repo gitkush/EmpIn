@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import json
-import numpy as np
 import requests
 from bs4 import BeautifulSoup
 import re
@@ -13,7 +12,6 @@ import random
 
 from seleniumwire import webdriver
 
-from webdriver_manager.chrome import ChromeDriverManager
 
 
 from selenium.webdriver.chrome.options import Options
