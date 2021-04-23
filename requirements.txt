@@ -2,7 +2,6 @@ streamlit
 scikit-learn
 pydeck
 pandas
-numpy
 matplotlib
 bs4
 lxml
