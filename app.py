@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import json
 import numpy as np
 import requests
 from bs4 import BeautifulSoup
@@ -7,16 +8,28 @@ import re
 import time
 
 
+from time import sleep
+import random
+
+from seleniumwire import webdriver
+
+from webdriver_manager.chrome import ChromeDriverManager
+
+
+from selenium.webdriver.chrome.options import Options
+
+
 
 
 
 def main():
-	dframe = pd.DataFrame()
+	ddf = pd.DataFrame()
 
 	
 
-	st.title("Get data from Linkedⓘⓝ")
+	st.title("Get Linkedⓘⓝ Employee Data")
 	st.sidebar.title("Provide your details here:")
+
 	li_at = st.sidebar.text_input('Your li_at cookie:')
 
 	JSESSIONID = st.sidebar.text_input('Your JSESSIONID:')
@@ -25,769 +38,314 @@ def main():
 
     # GSHEET_LINK = st.sidebar.text_input('Link to "readable" GSHEET with input:')
 
-	if st.sidebar.button('Get Data for Single Company'):
-		company_dict = get_data(li_at, JSESSIONID, company)
-		df = build_data(company_dict, dframe)
+	if st.sidebar.button('Get Employees for Single Company'):
+		all_requests = get_data(li_at, JSESSIONID, company)
+		df = build_data(all_requests, ddf)
 		write_data(df)
 
-	companies = st.sidebar.text_area('(Multiple) Linkedin Company Names (newline separated):', value='', height=None, max_chars=None, key=None, help=None)
+	# companies = st.sidebar.text_area('(Multiple) Linkedin Company Names (newline separated):', value='', height=None, max_chars=None, key=None, help=None)
 
-	if st.sidebar.button('Get Data for Multiple Companies'):
-		df_m = get_build_data(li_at, JSESSIONID, companies)
-		write_data(df_m)
+	# if st.sidebar.button('Get Data for Multiple Companies'):
+	# 	df_m = get_build_data(li_at, JSESSIONID, companies)
+	# 	write_data(df_m)
 
 def get_data(li_at, JSESSIONID, company):
 
-	headers = {"user-agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36"}
+	options = Options()
+	options.add_argument("window-size=1920,1080")
+	options.add_argument('--headless')
+	options.add_argument('--disable-gpu')
 
-	company_link = "https://www.linkedin.com/voyager/api/organization/companies?decorationId=com.linkedin.voyager.deco.organization.web.WebFullCompanyMain-33&q=universalName&universalName="+str(company)
+	driver = webdriver.Chrome("/home/ankush/QuantumGA/chromedriver", chrome_options=options)
+
+	driver.get('https://www.google.com')
+
+	driver.get('https://www.linkedin.com/')
+
+	driver.delete_cookie("JSESSIONID")
+
+	driver.add_cookie({'name': 'li_at', 'value': li_at,'domain':'linkedin.com'})
+
+	driver.add_cookie({'name': 'JSESSIONID', 'value': JSESSIONID,'domain':'linkedin.com'})
+
+	url = "https://www.linkedin.com/company/"+str(company)+"/people/"
+
+	driver.get(url)
 
 
-	with requests.session() as s:
-	    s.cookies['li_at'] = li_at
-	    s.cookies["JSESSIONID"] = JSESSIONID
-	    s.headers = headers
-	    s.headers["csrf-token"] = s.cookies["JSESSIONID"]
-	    response = s.get(company_link)
-	    company_dict = response.json()
 
-	return company_dict
+	# Get scroll height
+	last_height = driver.execute_script("return document.body.scrollHeight")
+
+	while True:
+	    SCROLL_PAUSE_TIME = random.uniform(2.5, 4.5)
+	    
+	    # Scroll down to bottom
+	    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+
+	    # Wait to load page
+	    sleep(SCROLL_PAUSE_TIME)
+
+	    # Calculate new scroll height and compare with last scroll height
+	    new_height = driver.execute_script("return document.body.scrollHeight")
+	    if new_height == last_height:
+	        break
+	    last_height = new_height
+
+	fetched_requests = driver.requests
+
+	driver.quit()
+
+	return(fetched_requests)
+
+
+
+
+
+
+	# headers = {"user-agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36"}
+
+	# company_link = "https://www.linkedin.com/voyager/api/organization/companies?decorationId=com.linkedin.voyager.deco.organization.web.WebFullCompanyMain-33&q=universalName&universalName="+str(company)
+
+
+	# with requests.session() as s:
+	#     s.cookies['li_at'] = li_at
+	#     s.cookies["JSESSIONID"] = JSESSIONID
+	#     s.headers = headers
+	#     s.headers["csrf-token"] = s.cookies["JSESSIONID"]
+	#     response = s.get(company_link)
+	#     company_dict = response.json()
+
+	# return company_dict
 	
 
-def build_data(company_dict, dframe):
-
-	try:
-	    Name = company_dict["elements"][0]["name"]
-	   
-	except:
-	    Name = "NA"
-	   
-	    
-	try:
-	    Industries = company_dict["elements"][0]["companyIndustries"][0]["localizedName"]
-	   
-	except:
-	    Industries = "NA"
-	   
-	    
-	try:
-	    Keywords = company_dict["elements"][0]["specialities"]
-	    #List
-	except:
-	    Keywords = "NA"
-	   
-	    
-	try:
-	    Website_URL = company_dict["elements"][0]["companyPageUrl"] 
-	   
-	except:
-	    Website_URL = "NA"
-	   
-	    
-	try:
-	    E_mail = "NA"
-	   
-	except:
-	    E_mail = "NA"
-	   
-	    
-	try:
-	    Logo_URL_Root = company_dict["elements"][0]["logo"]["image"]["com.linkedin.common.VectorImage"]["rootUrl"].split("/")[5]
-	   
-	    Logo_URL_400 = company_dict["elements"][0]["logo"]["image"]["com.linkedin.common.VectorImage"]["artifacts"]
-	    for width in Logo_URL_400:
-	        if(width["width"]==400):
-	            Logo_URL = "https://media-exp1.licdn.com/dms/image/"+Logo_URL_Root+"/company-logo_"+width["fileIdentifyingUrlPathSegment"]
-
-	   
-	except:
-	    Logo_URL = "NA"
-	   
-
-	try:
-	    Available_profiles = "NA"
-	   
-	except:
-	    Available_profiles = "NA"
-	   
-	    
-	try:
-	    Primary_role = "NA"
-	   
-	except:
-	    Primary_role = "NA"
-	   
-	    
-	try:
-	    LinkedIn_Normalized_Number = company_dict["elements"][0]["entityUrn"].split(":")[3]
-	   
-	except:
-	    LinkedIn_Normalized_Number = "NA"
-	   
-	    
-	try:
-	    LinkedIn_Universal_Name = company_dict["elements"][0]["universalName"]
-	   
-	except:
-	    LinkedIn_Universal_Name = "NA"
-	   
-	    
-	try:
-	    Year_Founded = company_dict["elements"][0]["foundedOn"]["year"]
-	   
-	except:
-	    Year_Founded = "NA"
-	   
-	    
-	try:
-	    LinkedIn_URL = company_dict["elements"][0]["url"]
-	   
-	except:
-	    LinkedIn_URL = "NA"
-	   
-	    
-	try:
-	    LinkdedIn_SalesNavigator_URL = company_dict["elements"][0]["salesNavigatorCompanyUrl"]
-	   
-	except:
-	    LinkdedIn_SalesNavigator_URL = "NA"
-	   
-
-	try:
-	    Crunchbase_URL = company_dict["elements"][0]["fundingData"]["companyCrunchbaseUrl"].split("?")[0]
-	   
-	except:
-	    Crunchbase_URL = "NA"
-	   
-	    
-	try:
-	    Facebook_URL = "NA"
-	   
-	except:
-	    Facebook_URL = "NA"
-	   
-	    
-	try:
-	    Twitter_URL = "NA"
-	   
-	except:
-	    Twitter_URL = "NA"
-	   
-	    
-	try:
-	    No_of_Employees_min = company_dict["elements"][0]["staffCountRange"]["start"]
-	   
-	except:
-	    No_of_Employees_min = "NA"
-	   
-	    
-	try:
-	    No_of_Employees_max = company_dict["elements"][0]["staffCountRange"]["end"]
-	   
-	except:
-	    No_of_Employees_max = "NA"
-	   
-	    
-	try:
-	    No_of_Employees_actual = company_dict["elements"][0]["staffCount"]
-	   
-	except:
-	    No_of_Employees_actual = "NA"
-	   
-
-	try:
-	    HQ_Address = company_dict["elements"][0]["headquarter"]["line1"]
-	   
-	except:
-	    HQ_Address = "NA"
-	   
-	    
-	try:
-	    Suite = "NA"
-	   
-	except:
-	    Suite = "NA"
-	   
-	    
-	try:
-	    HQ_City = company_dict["elements"][0]["headquarter"]["city"]
-	   
-	except:
-	    HQ_City = "NA"
-	   
-	    
-	try:
-	    HQ_Country = company_dict["elements"][0]["headquarter"]["country"]
-	   
-	except:
-	    HQ_Country = "NA"
-	   
-	    
-	try:
-	    HQ_State = company_dict["elements"][0]["headquarter"]["geographicArea"]
-	   
-	except:
-	    HQ_State = "NA"
-	   
-	    
-	try:
-	    HQ_Postal_Code = company_dict["elements"][0]["headquarter"]["postalCode"]
-	   
-	except:
-	    HQ_Postal_Code = "NA"
-	   
-	    
-	try:
-	    Phone = company_dict["elements"][0]["headquarter"]["phone"]
-	   
-	except:
-	    Phone = "NA"
-	   
-
-	try:
-	    Fax = "NA"
-	   
-	except:
-	    Fax = "NA"
-	   
-
-	try:
-	    Company_Status = company_dict["elements"][0]["companyType "]["localizedName"]
-	   
-	except:
-	    Company_Status = "NA"
-	   
-
-	try:
-	    Investor_Type = "NA"
-	   
-	except:
-	    Investor_Type = "NA"
-	   
-	    
-	try:
-	    LinkedIn_Short_Description = company_dict["elements"][0]["tagline"]
-	   
-	except:
-	    LinkedIn_Short_Description = "NA"
-	   
-	    
-	try:
-	    LinkedIn_Long_Description = company_dict["elements"][0]["description"]
-	   
-	except:
-	    LinkedIn_Long_Description = "NA"
-	   
-
-	    
-	#For locations you have to loop through 
-
-
-	Location_Address = []
-	try:
-	    for locations in company_dict["elements"][0]["confirmedLocations"]:
-	        try:
-	            Location_Address.append(locations["line1"])
-	        except:
-	            Location_Address.append("NA")
-	except:
-	    Location_Address.append("NA")
-
-
-
-
-	Location_Suite = []
-	try:
-	    for locations in company_dict["elements"][0]["confirmedLocations"]:
-	        try:
-	            Location_Suite.append("NA")
-	        except:
-	            Location_Suite.append("NA")
-	except:
-	    Location_Suite.append("NA")
-
-
-
-
-
-	Location_City = []
-	try:
-	    for locations in company_dict["elements"][0]["confirmedLocations"]:
-	        try:
-	            Location_City.append(locations["city"])
-	        except:
-	            Location_City.append("NA")
-	except:
-	    Location_City.append("NA")
-
-
-
-
-	Location_Country = []
-	try:
-	    for locations in company_dict["elements"][0]["confirmedLocations"]:
-	        try:
-	            Location_Country.append(locations["country"])
-	        except:
-	            Location_Country.append("NA")
-	except:
-	    Location_Country.append("NA")
-
-
-
-
-	Location_State = []
-	try:
-	    for locations in company_dict["elements"][0]["confirmedLocations"]:
-	        try:
-	            Location_State.append(locations["geographicArea"])
-	        except:
-	            Location_State.append("NA")
-	except:
-	    Location_State.append("NA")
-
-
-
-
-	Location_Postal_Code = []
-	try:
-	    for locations in company_dict["elements"][0]["confirmedLocations"]:
-	        try:
-	            Location_Postal_Code.append(locations["postalCode"])
-	        except:
-	            Location_Postal_Code.append("NA")
-	except:
-	    Location_Postal_Code.append("NA")
-
-
-
-	    
-	try:
-	    Headquarters = company_dict["elements"][0]["confirmedLocations"]["headquarter"]
-	except:
-	    Headquarters = "NA"
-
-	d = {'Name': [Name],
-	'Industries': [Industries],
-	'Keywords': [Keywords],
-	'Website_URL': [Website_URL],
-	'E_mail': [E_mail],
-	'Logo_URL': [Logo_URL],
-	'Available_profiles': [Available_profiles],
-	'Primary_role': [Primary_role],
-	'LinkedIn_Normalized_Number': [LinkedIn_Normalized_Number],
-	'LinkedIn_Universal_Name': [LinkedIn_Universal_Name],
-	'Year_Founded': [Year_Founded],
-	'LinkedIn_URL': [LinkedIn_URL],
-	'LinkdedIn_SalesNavigator_URL': [LinkdedIn_SalesNavigator_URL],
-	'Crunchbase_URL': [Crunchbase_URL],
-	'Facebook_URL': [Facebook_URL],
-	'Twitter_URL': [Twitter_URL],
-	'No_of_Employees_min': [No_of_Employees_min],
-	'No_of_Employees_max': [No_of_Employees_max],
-	'No_of_Employees_actual': [No_of_Employees_actual],
-	'HQ_Address': [HQ_Address],
-	'Suite': [Suite],
-	'HQ_City': [HQ_City],
-	'HQ_Country': [HQ_Country],
-	'HQ_State': [HQ_State],
-	'HQ_Postal_Code': [HQ_Postal_Code],
-	'Phone': [Phone],
-	'Fax': [Fax],
-	'Company_Status': [Company_Status],
-	'Investor_Type': [Investor_Type],
-	'LinkedIn_Short_Description': [LinkedIn_Short_Description],
-	'LinkedIn_Long_Description': [LinkedIn_Long_Description],
-	'Location_Address': [Location_Address],
-	'Location_Suite': [Location_Suite],
-	'Location_City': [Location_City],
-	'Location_Country': [Location_Country],
-	'Location_State': [Location_State],
-	'Location_Postal_Code': [Location_Postal_Code],
-	'Headquarters': [Headquarters],}
-
-	dftemp = pd.DataFrame(data=d)
-	dframe = dframe.append(dftemp,ignore_index=True)
-
-
-	return dframe
-
-
-def get_build_data(li_at, JSESSIONID, companies):
-	dframe_multiple = pd.DataFrame()
-
-	com = companies.split("\n")
-
-	for company in com:
-			headers = {"user-agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36"}
-
-			company_link = "https://www.linkedin.com/voyager/api/organization/companies?decorationId=com.linkedin.voyager.deco.organization.web.WebFullCompanyMain-33&q=universalName&universalName="+str(company)
-
-			time.sleep(1)
-			with requests.session() as s:
-			    s.cookies['li_at'] = li_at
-			    s.cookies["JSESSIONID"] = JSESSIONID
-			    s.headers = headers
-			    s.headers["csrf-token"] = s.cookies["JSESSIONID"]
-			    response = s.get(company_link)
-			    company_dict = response.json()
-
-			try:
-			    Name = company_dict["elements"][0]["name"]
-			   
-			except:
-			    Name = "NA"
-			   
-			    
-			try:
-			    Industries = company_dict["elements"][0]["companyIndustries"][0]["localizedName"]
-			   
-			except:
-			    Industries = "NA"
-			   
-			    
-			try:
-			    Keywords = company_dict["elements"][0]["specialities"]
-			    #List
-			except:
-			    Keywords = "NA"
-			   
-			    
-			try:
-			    Website_URL = company_dict["elements"][0]["companyPageUrl"] 
-			   
-			except:
-			    Website_URL = "NA"
-			   
-			    
-			try:
-			    E_mail = "NA"
-			   
-			except:
-			    E_mail = "NA"
-			   
-			    
-			try:
-			    Logo_URL_Root = company_dict["elements"][0]["logo"]["image"]["com.linkedin.common.VectorImage"]["rootUrl"].split("/")[5]
-			   
-			    Logo_URL_400 = company_dict["elements"][0]["logo"]["image"]["com.linkedin.common.VectorImage"]["artifacts"]
-			    for width in Logo_URL_400:
-			        if(width["width"]==400):
-			            Logo_URL = "https://media-exp1.licdn.com/dms/image/"+Logo_URL_Root+"/company-logo_"+width["fileIdentifyingUrlPathSegment"]
-
-			   
-			except:
-			    Logo_URL = "NA"
-			   
-
-			try:
-			    Available_profiles = "NA"
-			   
-			except:
-			    Available_profiles = "NA"
-			   
-			    
-			try:
-			    Primary_role = "NA"
-			   
-			except:
-			    Primary_role = "NA"
-			   
-			    
-			try:
-			    LinkedIn_Normalized_Number = company_dict["elements"][0]["entityUrn"].split(":")[3]
-			   
-			except:
-			    LinkedIn_Normalized_Number = "NA"
-			   
-			    
-			try:
-			    LinkedIn_Universal_Name = company_dict["elements"][0]["universalName"]
-			   
-			except:
-			    LinkedIn_Universal_Name = "NA"
-			   
-			    
-			try:
-			    Year_Founded = company_dict["elements"][0]["foundedOn"]["year"]
-			   
-			except:
-			    Year_Founded = "NA"
-			   
-			    
-			try:
-			    LinkedIn_URL = company_dict["elements"][0]["url"]
-			   
-			except:
-			    LinkedIn_URL = "NA"
-			   
-			    
-			try:
-			    LinkdedIn_SalesNavigator_URL = company_dict["elements"][0]["salesNavigatorCompanyUrl"]
-			   
-			except:
-			    LinkdedIn_SalesNavigator_URL = "NA"
-			   
-
-			try:
-			    Crunchbase_URL = company_dict["elements"][0]["fundingData"]["companyCrunchbaseUrl"].split("?")[0]
-			   
-			except:
-			    Crunchbase_URL = "NA"
-			   
-			    
-			try:
-			    Facebook_URL = "NA"
-			   
-			except:
-			    Facebook_URL = "NA"
-			   
-			    
-			try:
-			    Twitter_URL = "NA"
-			   
-			except:
-			    Twitter_URL = "NA"
-			   
-			    
-			try:
-			    No_of_Employees_min = company_dict["elements"][0]["staffCountRange"]["start"]
-			   
-			except:
-			    No_of_Employees_min = "NA"
-			   
-			    
-			try:
-			    No_of_Employees_max = company_dict["elements"][0]["staffCountRange"]["end"]
-			   
-			except:
-			    No_of_Employees_max = "NA"
-			   
-			    
-			try:
-			    No_of_Employees_actual = company_dict["elements"][0]["staffCount"]
-			   
-			except:
-			    No_of_Employees_actual = "NA"
-			   
-
-			try:
-			    HQ_Address = company_dict["elements"][0]["headquarter"]["line1"]
-			   
-			except:
-			    HQ_Address = "NA"
-			   
-			    
-			try:
-			    Suite = "NA"
-			   
-			except:
-			    Suite = "NA"
-			   
-			    
-			try:
-			    HQ_City = company_dict["elements"][0]["headquarter"]["city"]
-			   
-			except:
-			    HQ_City = "NA"
-			   
-			    
-			try:
-			    HQ_Country = company_dict["elements"][0]["headquarter"]["country"]
-			   
-			except:
-			    HQ_Country = "NA"
-			   
-			    
-			try:
-			    HQ_State = company_dict["elements"][0]["headquarter"]["geographicArea"]
-			   
-			except:
-			    HQ_State = "NA"
-			   
-			    
-			try:
-			    HQ_Postal_Code = company_dict["elements"][0]["headquarter"]["postalCode"]
-			   
-			except:
-			    HQ_Postal_Code = "NA"
-			   
-			    
-			try:
-			    Phone = company_dict["elements"][0]["headquarter"]["phone"]
-			   
-			except:
-			    Phone = "NA"
-			   
-
-			try:
-			    Fax = "NA"
-			   
-			except:
-			    Fax = "NA"
-			   
-
-			try:
-			    Company_Status = company_dict["elements"][0]["companyType "]["localizedName"]
-			   
-			except:
-			    Company_Status = "NA"
-			   
-
-			try:
-			    Investor_Type = "NA"
-			   
-			except:
-			    Investor_Type = "NA"
-			   
-			    
-			try:
-			    LinkedIn_Short_Description = company_dict["elements"][0]["tagline"]
-			   
-			except:
-			    LinkedIn_Short_Description = "NA"
-			   
-			    
-			try:
-			    LinkedIn_Long_Description = company_dict["elements"][0]["description"]
-			   
-			except:
-			    LinkedIn_Long_Description = "NA"
-			   
-
-			    
-			#For locations you have to loop through 
-
-
-			Location_Address = []
-			try:
-			    for locations in company_dict["elements"][0]["confirmedLocations"]:
-			        try:
-			            Location_Address.append(locations["line1"])
-			        except:
-			            Location_Address.append("NA")
-			except:
-			    Location_Address.append("NA")
-
-
-
-
-			Location_Suite = []
-			try:
-			    for locations in company_dict["elements"][0]["confirmedLocations"]:
-			        try:
-			            Location_Suite.append("NA")
-			        except:
-			            Location_Suite.append("NA")
-			except:
-			    Location_Suite.append("NA")
-
-
-
-
-
-			Location_City = []
-			try:
-			    for locations in company_dict["elements"][0]["confirmedLocations"]:
-			        try:
-			            Location_City.append(locations["city"])
-			        except:
-			            Location_City.append("NA")
-			except:
-			    Location_City.append("NA")
-
-
-
-
-			Location_Country = []
-			try:
-			    for locations in company_dict["elements"][0]["confirmedLocations"]:
-			        try:
-			            Location_Country.append(locations["country"])
-			        except:
-			            Location_Country.append("NA")
-			except:
-			    Location_Country.append("NA")
-
-
-
-
-			Location_State = []
-			try:
-			    for locations in company_dict["elements"][0]["confirmedLocations"]:
-			        try:
-			            Location_State.append(locations["geographicArea"])
-			        except:
-			            Location_State.append("NA")
-			except:
-			    Location_State.append("NA")
-
-
-
-
-			Location_Postal_Code = []
-			try:
-			    for locations in company_dict["elements"][0]["confirmedLocations"]:
-			        try:
-			            Location_Postal_Code.append(locations["postalCode"])
-			        except:
-			            Location_Postal_Code.append("NA")
-			except:
-			    Location_Postal_Code.append("NA")
-
-
-
-			    
-			try:
-			    Headquarters = company_dict["elements"][0]["confirmedLocations"]["headquarter"]
-			except:
-			    Headquarters = "NA"
-
-			d = {'Name': [Name],
-			'Industries': [Industries],
-			'Keywords': [Keywords],
-			'Website_URL': [Website_URL],
-			'E_mail': [E_mail],
-			'Logo_URL': [Logo_URL],
-			'Available_profiles': [Available_profiles],
-			'Primary_role': [Primary_role],
-			'LinkedIn_Normalized_Number': [LinkedIn_Normalized_Number],
-			'LinkedIn_Universal_Name': [LinkedIn_Universal_Name],
-			'Year_Founded': [Year_Founded],
-			'LinkedIn_URL': [LinkedIn_URL],
-			'LinkdedIn_SalesNavigator_URL': [LinkdedIn_SalesNavigator_URL],
-			'Crunchbase_URL': [Crunchbase_URL],
-			'Facebook_URL': [Facebook_URL],
-			'Twitter_URL': [Twitter_URL],
-			'No_of_Employees_min': [No_of_Employees_min],
-			'No_of_Employees_max': [No_of_Employees_max],
-			'No_of_Employees_actual': [No_of_Employees_actual],
-			'HQ_Address': [HQ_Address],
-			'Suite': [Suite],
-			'HQ_City': [HQ_City],
-			'HQ_Country': [HQ_Country],
-			'HQ_State': [HQ_State],
-			'HQ_Postal_Code': [HQ_Postal_Code],
-			'Phone': [Phone],
-			'Fax': [Fax],
-			'Company_Status': [Company_Status],
-			'Investor_Type': [Investor_Type],
-			'LinkedIn_Short_Description': [LinkedIn_Short_Description],
-			'LinkedIn_Long_Description': [LinkedIn_Long_Description],
-			'Location_Address': [Location_Address],
-			'Location_Suite': [Location_Suite],
-			'Location_City': [Location_City],
-			'Location_Country': [Location_Country],
-			'Location_State': [Location_State],
-			'Location_Postal_Code': [Location_Postal_Code],
-			'Headquarters': [Headquarters],}
-
-			dftemp = pd.DataFrame(data=d)
-			dframe_multiple = dframe_multiple.append(dftemp,ignore_index=True)			
-
-
-
-	return dframe_multiple
+def build_data(all_requests, ddf):
+
+	for request in all_requests:
+	    if request.response:
+	        if 'voyager/api/search/hits' in request.path:
+
+	            
+	            y = json.loads(request.response.body.decode("utf-8")) 
+	            
+	            for ele in y["data"]["elements"]:
+
+	                try:
+	                    LinkedIn_ID_AlphaNumeric = ele["hitInfo"]["id"]
+	                except:
+	                    LinkedIn_ID_AlphaNumeric = "NA" 
+
+	                for inc in y["included"]:
+	                    if (inc["entityUrn"].split(":")[3] == LinkedIn_ID_AlphaNumeric):
+
+	                        try:
+
+	                            First_Name = inc["firstName"]
+	                            break # If you don't break the loop after finding a firstName , then any other later LinkedIn_ID_AlphaNumeric match that doesn't have required field will result in executing except and hence an NA assignment
+
+	                        except:
+
+	                            First_Name = "NA"
+	                            
+	                if bool(First_Name)==0:
+	                    First_Name = "NA"
+
+	                for inc in y["included"]:
+	                    if (inc["entityUrn"].split(":")[3] == LinkedIn_ID_AlphaNumeric):
+
+	                        try:
+
+	                            Last_Name = inc["lastName"]
+	                            break # If you don't break the loop after finding a lastName , then any other later LinkedIn_ID_AlphaNumeric match that doesn't have required field will result in executing except and hence an NA assignment
+	                        except:
+
+	                            Last_Name = "NA"
+	                            
+	                if bool(Last_Name)==0:
+	                    Last_Name = "NA"
+	                    
+	                if First_Name == "NA" and Last_Name == "NA":
+	                    Name = "NA"
+	                else:
+	                    Name = First_Name+" "+Last_Name 
+
+	                try:
+	                    LinkedIn_ID_No = ele["hitInfo"]["backendUrn"].split(":")[3]
+	                except:
+	                    LinkedIn_ID_No = "NA"         
+
+	                for inc in y["included"]:
+	                    if (inc["entityUrn"].split(":")[3] == LinkedIn_ID_AlphaNumeric):
+
+	                        try:
+
+	                            Linkedin_Public_ID = inc["publicIdentifier"]
+	                            break #important
+	                        except:
+
+	                            Linkedin_Public_ID = "NA"
+
+	                if Linkedin_Public_ID == "NA":
+	                    LinkedIn_URL = "NA"
+	                else:
+	                    LinkedIn_URL = "linkedin.com/in/"+str(Linkedin_Public_ID)
+
+	                try:
+	                    Facebook_URL = "NA"
+	                except:
+	                    Facebook_URL = "NA"      
+
+	                try:
+	                    Twitter_URL = "NA"
+	                except:
+	                    Twitter_URL = "NA"  
+
+	                try:
+	                    External_Id = "NA"
+	                except:
+	                    External_Id = "NA"
+
+	                try:
+	                    Address = "NA"
+	                except:
+	                    Address = "NA" 
+
+	                try:
+	                    Suite = "NA"
+	                except:
+	                    Suite = "NA"        
+
+	                try:
+	                    City = ele["hitInfo"]["location"].split(",")[0] #WIP what is there is no comma ; is input city or country
+	                except:
+	                    City = "NA"          
+
+	                try:
+	                    try:
+
+	                        Country = ele["hitInfo"]["location"].split(",")[1].strip()
+
+	                    except:
+	                        Country = ele["hitInfo"]["location"].split(",")[0].strip()         
+	                except:
+	                    Country = "NA"
+
+	                if Country == "Canada Area": #WIP - May have to build multiple cleanup cases
+	                    Country = "Canada"
+
+	                try:
+	                    State = "NA"
+	                except:
+	                    State = "NA"  
+
+
+	                try:
+	                    Postal_Code = "NA"
+	                except:
+	                    Postal_Code = "NA"
+
+
+	                try:
+	                    Phone = "NA"
+	                except:
+	                    Phone = "NA"  
+
+	                for inc in y["included"]:
+	                    if (inc["entityUrn"].split(":")[3] == LinkedIn_ID_AlphaNumeric):
+
+	                        try:
+
+	                            rootURL = inc["picture"]["rootUrl"].split("/")[5]
+	                            fileIdentifyingUrlPathSegment = inc["picture"]["artifacts"][2]["fileIdentifyingUrlPathSegment"]
+
+	                            Profile_image_URL = "https://media-exp1.licdn.com/dms/image/"+str(rootURL)+("/profile-displayphoto-shrink_")+str(fileIdentifyingUrlPathSegment)
+
+	                            break
+	                        except:
+
+	                            Profile_image_URL = "NA"
+
+
+	                try:
+	                    Current = "WIP"
+	                except:
+	                    Current = "WIP"
+
+
+	                try:
+	                    Job_Title = ele["hitInfo"]["snippets"][0][heading][text].split("at")[0].strip()
+
+	                except:
+	                    for inc in y["included"]:
+	                        if (inc["entityUrn"].split(":")[3] == LinkedIn_ID_AlphaNumeric):
+
+	                            try:
+	                                Job_Title = inc["occupation"].split("at")[0].strip()
+
+	                                break # Important
+	                            except:
+
+	                                Job_Title = "NA"     
+
+	                try:
+	                    Job_Type = "WIP"
+	                except:
+	                    Job_Type = "WIP"
+
+	                try:
+	                    Present_State = "NA"
+	                except:
+	                    Present_State = "NA"
+
+	                try:
+	                    Started_On = "NA"
+	                except:
+	                    Started_On = "NA"
+
+	                try:
+	                    Organization_Identifier = "WIP"
+	                except:
+	                    Organization_Identifier = "WIP"
+
+	                try:
+	                    Ended_On = "NA"
+	                except:
+	                    Ended_On = "NA"                
+
+	                data = {
+	                    "First_Name" : [First_Name],
+	                    "Last_Name" : [Last_Name],
+	                    "Name" : [Name],
+	                    "LinkedIn_ID_No" : [LinkedIn_ID_No],
+	                    "Linkedin_Public_ID" : [Linkedin_Public_ID],
+	                    "LinkedIn_ID_AlphaNumeric" : [LinkedIn_ID_AlphaNumeric],
+	                    "LinkedIn_URL" : [LinkedIn_URL],
+	                    "Facebook_URL" : [Facebook_URL],
+	                    "Twitter_URL" : [Twitter_URL],
+	                    "External_Id" : [External_Id],
+	                    "Address" : [Address],
+	                    "Suite" : [Suite],
+	                    "City" : [City],
+	                    "Country" : [Country],
+	                    "State" : [State],
+	                    "Postal_Code" : [Postal_Code],
+	                    "Phone" : [Phone],
+	                    "Profile_image_URL" : [Profile_image_URL],
+	                    "Current" : [Current],
+	                    "Job_Title" : [Job_Title],
+	                    "Job_Type" : [Job_Type],
+	                    "Present_State" : [Present_State],
+	                    "Started_On" : [Started_On],
+	                    "Organization_Identifier" : [Organization_Identifier],
+	                    "Ended_On" : [Ended_On],
+	                }
+
+	                t = pd.DataFrame(data=data)
+	                ddf = ddf.append(t,ignore_index=True)
+
+
+	return ddf
+
 
 
 def write_data(dframe):
