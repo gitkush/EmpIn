@@ -6,3 +6,5 @@ numpy
 matplotlib
 bs4
 lxml
+seleniumwire
+selenium
