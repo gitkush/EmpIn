@@ -12,9 +12,20 @@ import random
 
 from seleniumwire import webdriver
 
-from webdriver_manager.chrome import ChromeDriverManager
+#from webdriver_manager.chrome import ChromeDriverManager # Commenting out to try selenium on heroku 
 
 from selenium.webdriver.chrome.options import Options
+
+
+import os
+
+# chrome_options = webdriver.ChromeOptions()
+# chrome_options.binary_location = os.environ.get("GOOGLE_CHROME_BIN")
+# chrome_options.add_argument("--headless")
+# chrome_options.add_argument("--disable-dev-shm-usage")
+# chrome_options.add_argument("--no-sandbox")
+
+# driver = webdriver.Chrome(executable_path=os.environ.get("CHROMEDRIVER_PATH"), chrome_options=chrome_options)
 
 
 
@@ -50,11 +61,16 @@ def main():
 def get_data(li_at, JSESSIONID, company):
 
 	options = Options()
+	options.binary_location = os.environ.get("GOOGLE_CHROME_BIN")
 	options.add_argument("window-size=1920,1080")
 	options.add_argument('--headless')
 	options.add_argument('--disable-gpu')
+	options.add_argument("--disable-dev-shm-usage")
+	options.add_argument("--no-sandbox")
+	
+	driver = webdriver.Chrome(executable_path=os.environ.get("CHROMEDRIVER_PATH"), chrome_options=options)
 
-	driver = webdriver.Chrome(ChromeDriverManager().install(), chrome_options=options)
+# 	driver = webdriver.Chrome(ChromeDriverManager().install(), chrome_options=options)
 
 	driver.get('https://www.google.com')
 
