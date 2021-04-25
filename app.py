@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import json
+import numpy as np
 import requests
 from bs4 import BeautifulSoup
 import re
@@ -12,20 +13,10 @@ import random
 
 from seleniumwire import webdriver
 
-from webdriver_manager.chrome import ChromeDriverManager # Comment out to try selenium on heroku 
+from webdriver_manager.chrome import ChromeDriverManager
+
 
 from selenium.webdriver.chrome.options import Options
-
-
-import os
-
-# chrome_options = webdriver.ChromeOptions()
-# chrome_options.binary_location = os.environ.get("GOOGLE_CHROME_BIN")
-# chrome_options.add_argument("--headless")
-# chrome_options.add_argument("--disable-dev-shm-usage")
-# chrome_options.add_argument("--no-sandbox")
-
-# driver = webdriver.Chrome(executable_path=os.environ.get("CHROMEDRIVER_PATH"), chrome_options=chrome_options)
 
 
 
@@ -45,46 +36,40 @@ def main():
 
 	company = st.sidebar.text_input('(Single) Linkedin Company Name (lowercase):')
 
-    # GSHEET_LINK = st.sidebar.text_input('Link to "readable" GSHEET with input:')
 
-	if st.sidebar.button('Get Employees for Single Company'):
+	if st.sidebar.button('Get Data for Single Company'):
 		all_requests = get_data(li_at, JSESSIONID, company)
 		df = build_data(all_requests, ddf)
 		write_data(df)
 
-	# companies = st.sidebar.text_area('(Multiple) Linkedin Company Names (newline separated):', value='', height=None, max_chars=None, key=None, help=None)
 
-	# if st.sidebar.button('Get Data for Multiple Companies'):
-	# 	df_m = get_build_data(li_at, JSESSIONID, companies)
-	# 	write_data(df_m)
 
 def get_data(li_at, JSESSIONID, company):
 
 	options = Options()
-# 	options.binary_location = os.environ.get("GOOGLE_CHROME_BIN")
 	options.add_argument("window-size=1920,1080")
 	options.add_argument('--headless')
 	options.add_argument('--disable-gpu')
-# 	options.add_argument("--disable-dev-shm-usage")
-# 	options.add_argument("--no-sandbox")
-	
-# 	driver = webdriver.Chrome(executable_path=os.environ.get("CHROMEDRIVER_PATH"), chrome_options=options)
 
 	driver = webdriver.Chrome(ChromeDriverManager().install(), chrome_options=options)
 
-	driver.get('https://www.google.com')
 
-	driver.get('https://www.linkedin.com/')
+	driver.get('https://www.linkedin.com/404?_l=en_US')
 
-	driver.delete_cookie("JSESSIONID")
 
 	driver.add_cookie({'name': 'li_at', 'value': li_at,'domain':'linkedin.com'})
 
 	driver.add_cookie({'name': 'JSESSIONID', 'value': JSESSIONID,'domain':'linkedin.com'})
 
+
+
+	st.write("Sesssion Created")
+
+
 	url = "https://www.linkedin.com/company/"+str(company)+"/people/"
 
 	driver.get(url)
+
 
 
 
@@ -106,31 +91,13 @@ def get_data(li_at, JSESSIONID, company):
 	        break
 	    last_height = new_height
 
+
 	fetched_requests = driver.requests
 
 	driver.quit()
 
 	return(fetched_requests)
 
-
-
-
-
-
-	# headers = {"user-agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36"}
-
-	# company_link = "https://www.linkedin.com/voyager/api/organization/companies?decorationId=com.linkedin.voyager.deco.organization.web.WebFullCompanyMain-33&q=universalName&universalName="+str(company)
-
-
-	# with requests.session() as s:
-	#     s.cookies['li_at'] = li_at
-	#     s.cookies["JSESSIONID"] = JSESSIONID
-	#     s.headers = headers
-	#     s.headers["csrf-token"] = s.cookies["JSESSIONID"]
-	#     response = s.get(company_link)
-	#     company_dict = response.json()
-
-	# return company_dict
 	
 
 def build_data(all_requests, ddf):
@@ -364,6 +331,7 @@ def build_data(all_requests, ddf):
 
 def write_data(dframe):
 	st.write(dframe)
+	st.write("Sesssion Closed")
 
 
 
