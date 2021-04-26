@@ -1,8 +1,5 @@
 streamlit
-scikit-learn
-pydeck
 pandas
-matplotlib
 bs4
 lxml
 selenium-wire
