@@ -51,25 +51,50 @@ def get_data(li_at, JSESSIONID, company):
 	options.add_argument('--headless')
 	options.add_argument('--disable-gpu')
 
-	driver = webdriver.Chrome(ChromeDriverManager().install(), chrome_options=options)
+	driver = webdriver.Chrome("/home/ankush/QuantumGA/chromedriver", chrome_options=options)
 
 
 	driver.get('https://www.linkedin.com/404?_l=en_US')
 
 
+	if(driver.find_element_by_id('error404').text):
+		st.write("Starting Session")
+
+	else:
+		st.write("Couldn't start a session. Exiting...")
+		driver.quit()
+
+
+	# sleep(random.uniform(2.5, 4.5))
+
+	# driver.delete_cookie("JSESSIONID")
+
 	driver.add_cookie({'name': 'li_at', 'value': li_at,'domain':'linkedin.com'})
 
 	driver.add_cookie({'name': 'JSESSIONID', 'value': JSESSIONID,'domain':'linkedin.com'})
 
+	# sleep(random.uniform(5.5, 6.5))
+
+	
 
 
-	st.write("Sesssion Created")
 
 
 	url = "https://www.linkedin.com/company/"+str(company)+"/people/"
 
 	driver.get(url)
 
+	sleep(random.uniform(5.5, 6.5))
+
+	if(driver.find_element_by_class_name('mt1').text):
+		st.write("Sesssion Created")
+		st.write(driver.find_element_by_class_name('mt1').text)
+		sleep(random.uniform(1, 2.5))
+		st.write("Now Fethching Employee Data...")
+
+	else:
+		st.write("Couldn't create a session. Exiting...")
+		driver.quit()
 
 
 
